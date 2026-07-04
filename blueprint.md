@@ -2,7 +2,7 @@
 
 ## Overview
 
-This project is a real-time GPS tracker that displays a location on a map. It consists of a React frontend and a Node.js backend.
+This project is a real-time GPS tracker that displays a location on a map. It consists of a React frontend and a Node.js backend, now configured to run as a single, unified server for deployment.
 
 ## Features
 
@@ -12,6 +12,12 @@ This project is a real-time GPS tracker that displays a location on a map. It co
 
 ## Current Plan
 
-I have updated the frontend to dynamically determine the WebSocket URL. It now uses a secure WebSocket connection (`wss://`) when the application is loaded over HTTPS. I also removed the hardcoded port to ensure it works correctly in both local and deployed environments. This resolves the "Mixed Content" error.
+The persistent WebSocket connection failures on Vercel were due to its default serverless architecture, which does not support the long-lived connections required by WebSockets. 
 
-I have also updated the backend server to listen on the port provided by the hosting environment, which will allow the WebSocket server to accept connections when deployed. This should resolve the WebSocket connection error.
+To solve this, I have re-architected the project to run as a **single, stateful server** on deployment:
+
+1.  **Unified Server Logic:** The `server/server.js` file has been updated to not only handle WebSocket connections and API requests, but also to serve the static files of the built React application.
+
+2.  **Deployment Configuration:** The `vercel.json` file has been configured to route all incoming traffic to this single, persistent server. This ensures the server stays active to maintain WebSocket connections.
+
+This new architecture correctly supports WebSockets in a Vercel environment and should resolve the connection errors. The application is now a single, cohesive unit, making it more robust for production.

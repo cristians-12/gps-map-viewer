@@ -1,15 +1,25 @@
 import express from 'express';
 import http from 'http';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import { WebSocketServer } from 'ws';
+
+// Since we are using ES Modules, __dirname is not available directly.
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server });
 
-// Use the port provided by the environment, or default to 8080 for local development
 const PORT = process.env.PORT || 8080;
 
 app.use(express.json());
+
+// --- Serve Static Files ---
+// Point to the build directory of the React app
+const frontendDistPath = path.join(__dirname, '..', 'dist');
+app.use(express.static(frontendDistPath));
 
 wss.on('connection', (ws) => {
   console.log('Client connected to WebSocket server');
@@ -39,6 +49,12 @@ app.post('/gps-update', (req, res) => {
   });
 
   res.status(200).json({ message: 'Position received and broadcasted' });
+});
+
+// --- SPA Fallback ---
+// For any request that doesn't match a static file or the API, serve the main HTML file.
+app.get('*', (req, res) => {
+  res.sendFile(path.join(frontendDistPath, 'index.html'));
 });
 
 server.listen(PORT, () => {
