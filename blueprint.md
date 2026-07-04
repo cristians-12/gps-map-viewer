@@ -13,3 +13,5 @@ This project is a real-time GPS tracker that displays a location on a map. It co
 ## Current Plan
 
 I have updated the frontend to dynamically determine the WebSocket URL. It now uses a secure WebSocket connection (`wss://`) when the application is loaded over HTTPS. I also removed the hardcoded port to ensure it works correctly in both local and deployed environments. This resolves the "Mixed Content" error.
+
+I have also updated the backend server to listen on the port provided by the hosting environment, which will allow the WebSocket server to accept connections when deployed. This should resolve the WebSocket connection error.

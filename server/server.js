@@ -6,11 +6,10 @@ const app = express();
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server });
 
-const PORT = 8080;
-
+// Use the port provided by the environment, or default to 8080 for local development
+const PORT = process.env.PORT || 8080;
 
 app.use(express.json());
-
 
 wss.on('connection', (ws) => {
   console.log('Client connected to WebSocket server');
