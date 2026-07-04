@@ -1,27 +1,42 @@
-import { useEffect, useState } from "react"
-import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet'
-import { supabase } from "../supabase/supabaseClient"
+import { useEffect, useState } from "react";
+import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
+
+// Dynamically set the WebSocket URL based on the hostname
+const host = window.location.hostname;
+const WS_URL = `ws://${host}:8080`;
 
 export function Viewer() {
-  const [pos, setPos] = useState(null)
+  const [pos, setPos] = useState(null);
 
   useEffect(() => {
-    const channel = supabase.channel("vehicle:demo")
+    const ws = new WebSocket(WS_URL);
 
-    channel
-      .on(
-        "broadcast",
-        { event: "position_updated" },
-        ({ payload }) => setPos(payload)
-      )
-      .subscribe()
+    ws.onopen = () => {
+      console.log('Connected to WebSocket server');
+    };
+
+    ws.onmessage = (event) => {
+      const data = JSON.parse(event.data);
+      console.log('Received data from WebSocket:', data);
+      if (data.lat && data.lng) {
+        setPos(data);
+      }
+    };
+
+    ws.onclose = () => {
+      console.log('Disconnected from WebSocket server');
+    };
+
+    ws.onerror = (error) => {
+      console.error('WebSocket error:', error);
+    };
 
     return () => {
-      supabase.removeChannel(channel)
-    }
-  }, [])
+      ws.close();
+    };
+  }, []);
 
-  const position = pos ? [pos.lat, pos.lng] : [51.505, -0.09]
+  const position = pos ? [pos.lat, pos.lng] : [51.505, -0.09];
 
   return (
     <MapContainer center={position} zoom={13} scrollWheelZoom={false} style={{ height: '100vh', width: '100%' }}>
@@ -32,10 +47,10 @@ export function Viewer() {
       {pos && (
         <Marker position={position}>
           <Popup>
-            A pretty CSS3 popup. <br /> Easily customizable.
+            Current Location: <br /> Lat: {pos.lat}, Lng: {pos.lng}
           </Popup>
         </Marker>
       )}
     </MapContainer>
-  )
+  );
 }
