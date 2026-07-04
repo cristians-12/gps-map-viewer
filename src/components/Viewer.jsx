@@ -1,14 +1,28 @@
 import { useEffect, useState } from "react";
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 
-// Dynamically set the WebSocket URL based on the hostname
-const host = window.location.hostname;
-const WS_URL = `ws://${host}:8080`;
+// Dynamically set the WebSocket URL
+const getWebSocketURL = () => {
+  const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
+  const host = window.location.hostname;
+
+  // For local development, connect to the specific port our server is running on.
+  if (host === 'localhost') {
+    return `ws://${host}:8080`;
+  }
+
+  // For production, connect on the same host, using the default port for the protocol.
+  // The hosting service (like Vercel) will route the request to our running server.
+  return `${protocol}://${host}`;
+};
+
+const WS_URL = getWebSocketURL();
 
 export function Viewer() {
   const [pos, setPos] = useState(null);
 
   useEffect(() => {
+    console.log(`Connecting to WebSocket at: ${WS_URL}`);
     const ws = new WebSocket(WS_URL);
 
     ws.onopen = () => {
