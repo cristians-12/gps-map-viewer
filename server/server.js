@@ -9,20 +9,10 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 const server = http.createServer(app);
+const wss = new WebSocketServer({ server }); // Simple, robust attachment
 
-// Initialize WebSocket server without attaching it to the HTTP server directly
-const wss = new WebSocketServer({ noServer: true });
-
-// --- Explicitly Handle the HTTP Upgrade to WebSocket ---
-server.on('upgrade', (request, socket, head) => {
-  console.log('Upgrade request received. Handling WebSocket handshake.');
-  
-  // Let the WebSocket server handle the upgrade
-  wss.handleUpgrade(request, socket, head, (ws) => {
-    // The connection is established. Emit the 'connection' event.
-    wss.emit('connection', ws, request);
-  });
-});
+// Render provides the PORT environment variable
+const PORT = process.env.PORT || 8080;
 
 app.use(express.json());
 
@@ -30,7 +20,7 @@ const frontendDistPath = path.join(__dirname, '..', 'dist');
 app.use(express.static(frontendDistPath));
 
 wss.on('connection', (ws) => {
-  console.log('Client connected via handleUpgrade');
+  console.log('Client connected to WebSocket server');
 
   ws.on('close', () => {
     console.log('Client disconnected');
@@ -63,4 +53,7 @@ app.get('*', (req, res) => {
   res.sendFile(path.join(frontendDistPath, 'index.html'));
 });
 
-export default server;
+// Start the server
+server.listen(PORT, () => {
+  console.log(`HTTP and WebSocket server running on http://localhost:${PORT}`);
+});
