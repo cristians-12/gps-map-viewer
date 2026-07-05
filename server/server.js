@@ -12,7 +12,6 @@ const PORT = process.env.PORT || 8080;
 app.use(express.json());
 
 // --- Serve Static Files ---
-// Use process.cwd() which is the project root in Render's environment
 const frontendDistPath = path.join(process.cwd(), 'dist');
 console.log(`Serving static files from: ${frontendDistPath}`);
 
@@ -25,14 +24,18 @@ wss.on('connection', (ws) => {
 });
 
 app.post('/gps-update', (req, res) => {
-  const { lat, lng } = req.body;
-  console.log(`Received GPS data via POST: lat=${lat}, lng=${lng}`);
+  // Accept `lon` from the GPS device
+  const { lat, lon } = req.body;
+  console.log(`Received GPS data via POST: lat=${lat}, lon=${lon}`);
 
-  if (lat === undefined || lng === undefined) {
-    return res.status(400).json({ error: 'Invalid coordinates' });
+  // Validate the incoming data (lat and lon)
+  if (lat === undefined || lon === undefined) {
+    return res.status(400).json({ error: 'Invalid coordinates. Expecting lat and lon.' });
   }
 
-  const payload = JSON.stringify({ lat, lng });
+  // Create the payload for the frontend, which expects `lng`
+  const payload = JSON.stringify({ lat, lng: lon });
+
   wss.clients.forEach((client) => {
     if (client.readyState === client.OPEN) {
       client.send(payload);
