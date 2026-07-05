@@ -1,34 +1,27 @@
 import express from 'express';
 import http from 'http';
 import path from 'path';
-import { fileURLToPath } from 'url';
 import { WebSocketServer } from 'ws';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 const app = express();
 const server = http.createServer(app);
-const wss = new WebSocketServer({ server }); // Simple, robust attachment
+const wss = new WebSocketServer({ server });
 
-// Render provides the PORT environment variable
 const PORT = process.env.PORT || 8080;
 
 app.use(express.json());
 
-const frontendDistPath = path.join(__dirname, '..', 'dist');
+// --- Serve Static Files ---
+// Use process.cwd() which is the project root in Render's environment
+const frontendDistPath = path.join(process.cwd(), 'dist');
+console.log(`Serving static files from: ${frontendDistPath}`);
+
 app.use(express.static(frontendDistPath));
 
 wss.on('connection', (ws) => {
   console.log('Client connected to WebSocket server');
-
-  ws.on('close', () => {
-    console.log('Client disconnected');
-  });
-
-  ws.on('error', (error) => {
-    console.error('WebSocket Error:', error);
-  });
+  ws.on('close', () => console.log('Client disconnected'));
+  ws.on('error', (error) => console.error('WebSocket Error:', error));
 });
 
 app.post('/gps-update', (req, res) => {
@@ -49,11 +42,12 @@ app.post('/gps-update', (req, res) => {
   res.status(200).json({ message: 'Position received and broadcasted' });
 });
 
+// --- SPA Fallback ---
 app.get('*', (req, res) => {
-  res.sendFile(path.join(frontendDistPath, 'index.html'));
+  const indexPath = path.join(frontendDistPath, 'index.html');
+  res.sendFile(indexPath);
 });
 
-// Start the server
 server.listen(PORT, () => {
-  console.log(`HTTP and WebSocket server running on http://localhost:${PORT}`);
+  console.log(`HTTP and WebSocket server running on port ${PORT}`);
 });
