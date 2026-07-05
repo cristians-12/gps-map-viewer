@@ -4,7 +4,7 @@ import path from 'path';
 import { WebSocketServer } from 'ws';
 import net from 'net';
 import mqtt from 'mqtt';
-import 'dotenv/config'; // Cargar variables de entorno
+import 'dotenv/config'; // Cargar variables de entorno para las credenciales MQTT
 
 const app = express();
 const server = http.createServer(app);
@@ -16,19 +16,32 @@ app.use(express.json());
 const frontendDistPath = path.join(process.cwd(), 'dist');
 console.log(`Serving static files from: ${frontendDistPath}`);
 app.use(express.static(frontendDistPath));
+
 wss.on('connection', (ws) => {
   console.log('Client connected to WebSocket server');
   ws.on('close', () => console.log('Client disconnected'));
   ws.on('error', (error) => console.error('WebSocket Error:', error));
 });
-// --- MQTT: receive GPS data from A7670G and forward to WebSocket ---
-const mqttClient = mqtt.connect('mqtt://broker.emqx.io:1883', {
-  clientId: 'backend_' + Math.random().toString(16).substring(2, 10)
+
+// --- MQTT: Conexión al broker privado de HiveMQ Cloud ---
+const MQTT_BROKER_URL = 'mqtts://4bdcb551f1a149a7a2e219bbd2bf2d18.s1.eu.hivemq.cloud:8883';
+const mqttClient = mqtt.connect(MQTT_BROKER_URL, {
+  clientId: `backend_${Math.random().toString(16).substring(2, 10)}`,
+  username: process.env.MQTT_USERNAME,
+  password: process.env.MQTT_PASSWORD,
 });
+
 mqttClient.on('connect', () => {
-  console.log('[MQTT] Conectado a HiveMQ Cloud');
-  mqttClient.subscribe('gps/data');
+  console.log(`[MQTT] Conectado exitosamente a HiveMQ Cloud`);
+  mqttClient.subscribe('gps/data', (err) => {
+    if (!err) {
+      console.log(`[MQTT] Suscrito correctamente al topic: gps/data`);
+    } else {
+      console.error(`[MQTT] Error al suscribirse: ${err}`);
+    }
+  });
 });
+
 mqttClient.on('message', (topic, message) => {
   console.log(`[MQTT] Recibido en ${topic}: ${message.toString()}`);
   wss.clients.forEach((client) => {
@@ -37,6 +50,11 @@ mqttClient.on('message', (topic, message) => {
     }
   });
 });
+
+mqttClient.on('error', (error) => {
+  console.error('[MQTT] Error de conexión:', error);
+});
+
 // --- Legacy HTTP endpoint (puedes borrarlo cuando no lo necesites) ---
 app.post('/gps-update', (req, res) => {
   const { lat, lon } = req.body;
@@ -52,11 +70,13 @@ app.post('/gps-update', (req, res) => {
   });
   res.status(200).json({ message: 'Position received and broadcasted' });
 });
+
 // --- SPA Fallback ---
 app.get('/*', (req, res) => {
   const indexPath = path.join(frontendDistPath, 'index.html');
   res.sendFile(indexPath);
 });
+
 // --- TCP raw server (opcional, por si acaso) ---
 net.createServer((socket) => {
   let buf = '';
@@ -71,6 +91,7 @@ net.createServer((socket) => {
     }
   });
 }).listen(5001);
+
 server.listen(PORT, () => {
   console.log(`HTTP and WebSocket server running on port ${PORT}`);
 });
