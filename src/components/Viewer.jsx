@@ -1,22 +1,44 @@
 import { useEffect, useState } from "react";
-import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
+import L from 'leaflet';
 
 // Dynamically set the WebSocket URL
 const getWebSocketURL = () => {
   const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
   const host = window.location.hostname;
 
-  // For local development, connect to the specific port our server is running on.
   if (host === 'localhost') {
     return `ws://${host}:8080`;
   }
 
-  // For production, connect on the same host, using the default port for the protocol.
-  // The hosting service (like Vercel) will route the request to our running server.
   return `${protocol}://${host}`;
 };
 
 const WS_URL = getWebSocketURL();
+
+// Create a custom motorcycle icon
+const motorcycleIcon = new L.Icon({
+  iconUrl: '/motorcycle.svg', // Path is relative to the public folder
+  iconSize: [40, 40], // Adjust size as needed
+  iconAnchor: [20, 40], // Point of the icon which will correspond to marker's location
+  popupAnchor: [0, -40] // Point from which the popup should open relative to the iconAnchor
+});
+
+// This component will handle map view updates
+function MapUpdater({ position }) {
+  const map = useMap();
+  useEffect(() => {
+    if (position) {
+      // Fly to the new position with a smooth animation
+      map.flyTo(position, 15, {
+        animate: true,
+        duration: 1.5
+      });
+    }
+  }, [position, map]);
+
+  return null; // This component does not render anything
+}
 
 export function Viewer() {
   const [pos, setPos] = useState(null);
@@ -31,7 +53,7 @@ export function Viewer() {
 
     ws.onmessage = (event) => {
       const data = JSON.parse(event.data);
-      console.log('Received data from WebSocket:', data);
+      console.log('Received new position from WebSocket:', data);
       if (data.lat && data.lng) {
         setPos(data);
       }
@@ -50,21 +72,25 @@ export function Viewer() {
     };
   }, []);
 
-  const position = pos ? [pos.lat, pos.lng] : [51.505, -0.09];
+  const position = pos ? [pos.lat, pos.lng] : null;
+  // Fallback initial position if we don't have one yet
+  const initialCenter = [10.4631, -73.2532];
 
   return (
-    <MapContainer center={position} zoom={13} scrollWheelZoom={false} style={{ height: '100vh', width: '100%' }}>
+    <MapContainer center={initialCenter} zoom={13} scrollWheelZoom={true} style={{ height: '100vh', width: '100%' }}>
       <TileLayer
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
       />
-      {pos && (
-        <Marker position={position}>
+      {position && (
+        <Marker position={position} icon={motorcycleIcon}>
           <Popup>
             Current Location: <br /> Lat: {pos.lat}, Lng: {pos.lng}
           </Popup>
         </Marker>
       )}
+      {/* Add the MapUpdater component to the map */}
+      <MapUpdater position={position} />
     </MapContainer>
   );
 }
