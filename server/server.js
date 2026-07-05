@@ -4,7 +4,6 @@ import path from 'path';
 import { WebSocketServer } from 'ws';
 import net from 'net';
 import mqtt from 'mqtt';
-import 'dotenv/config'; // Cargar variables de entorno para las credenciales MQTT
 
 const app = express();
 const server = http.createServer(app);
@@ -23,16 +22,14 @@ wss.on('connection', (ws) => {
   ws.on('error', (error) => console.error('WebSocket Error:', error));
 });
 
-// --- MQTT: Conexión al broker privado de HiveMQ Cloud ---
-const MQTT_BROKER_URL = 'mqtts://4bdcb551f1a149a7a2e219bbd2bf2d18.s1.eu.hivemq.cloud:8883';
+// --- MQTT: Conexión al broker público de EMQX ---
+const MQTT_BROKER_URL = 'mqtt://broker.emqx.io:1883';
 const mqttClient = mqtt.connect(MQTT_BROKER_URL, {
   clientId: `backend_${Math.random().toString(16).substring(2, 10)}`,
-  username: process.env.MQTT_USERNAME,
-  password: process.env.MQTT_PASSWORD,
 });
 
 mqttClient.on('connect', () => {
-  console.log(`[MQTT] Conectado exitosamente a HiveMQ Cloud`);
+  console.log(`[MQTT] Conectado exitosamente al broker público EMQX`);
   mqttClient.subscribe('gps/data', (err) => {
     if (!err) {
       console.log(`[MQTT] Suscrito correctamente al topic: gps/data`);
