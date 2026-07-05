@@ -45,7 +45,7 @@ app.post('/gps-update', (req, res) => {
 });
 
 // --- SPA Fallback ---
-app.get('*', (req, res) => {
+app.get('/*', (req, res) => {
   const indexPath = path.join(frontendDistPath, 'index.html');
   res.sendFile(indexPath);
 });

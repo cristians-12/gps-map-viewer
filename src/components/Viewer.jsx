@@ -16,10 +16,10 @@ const getWebSocketURL = () => {
 
 const WS_URL = getWebSocketURL();
 
-// Create a custom motorcycle icon from the WebP file
+
 const motorcycleIcon = new L.Icon({
   iconUrl: '/motorcycle.webp', // Path to the image in the public folder
-  iconSize: [48, 48],      // Adjust size as needed, e.g., [width, height]
+  iconSize: [48, 60],      // Adjust size as needed, e.g., [width, height]
   iconAnchor: [24, 48],      // Point of the icon which will correspond to marker's location
   popupAnchor: [0, -48]     // Point from which the popup should open relative to the iconAnchor
 });
