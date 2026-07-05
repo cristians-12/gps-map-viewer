@@ -1,4 +1,3 @@
-'''
 import express from 'express';
 import http from 'http';
 import path from 'path';
@@ -25,8 +24,8 @@ wss.on('connection', (ws) => {
 // --- MQTT: receive GPS data from A7670G and forward to WebSocket ---
 const mqttClient = mqtt.connect('mqtts://4bdcb551f1a149a7a2e219bbd2bf2d18.s1.eu.hivemq.cloud:8883', {
   clientId: 'backend_' + Math.random().toString(16).substring(2, 10),
-  username: process.env.MQTT_USERNAME, // Usar variable de entorno
-  password: process.env.MQTT_PASSWORD  // Usar variable de entorno
+  username: process.env.MQTT_USERNAME,
+  password: process.env.MQTT_PASSWORD 
 });
 mqttClient.on('connect', () => {
   console.log('[MQTT] Conectado a HiveMQ Cloud');
@@ -77,4 +76,3 @@ net.createServer((socket) => {
 server.listen(PORT, () => {
   console.log(`HTTP and WebSocket server running on port ${PORT}`);
 });
-'''
