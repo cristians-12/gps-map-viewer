@@ -24,7 +24,6 @@ wss.on('connection', (ws) => {
 });
 
 app.post('/gps-update', (req, res) => {
-  // Accept `lon` from the GPS device
   const { lat, lon } = req.body;
   console.log(`Received GPS data via POST: lat=${lat}, lon=${lon}`);
 
