@@ -1,71 +1,99 @@
 import express from 'express';
 import http from 'http';
 import path from 'path';
+import dgram from 'dgram';
 import { WebSocketServer } from 'ws';
-import net from 'net';
-import mqtt from 'mqtt';
 
 const app = express();
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server });
 const PORT = process.env.PORT || 8080;
 
-app.use(express.json());
-// --- Serve Static Files ---
-const frontendDistPath = path.join(process.cwd(), 'dist');
-console.log(`Serving static files from: ${frontendDistPath}`);
-app.use(express.static(frontendDistPath));
+// --- UDP Server para recibir GPS ---
+const udpServer = dgram.createSocket('udp4');
+const UDP_PORT = 41234;
 
-wss.on('connection', (ws) => {
-  console.log('Client connected to WebSocket server');
-  ws.on('close', () => console.log('Client disconnected'));
-  ws.on('error', (error) => console.error('WebSocket Error:', error));
+console.log(`Starting UDP server on port ${UDP_PORT}...`);
+udpServer.bind(UDP_PORT, '0.0.0.0', () => {
+  console.log(`[UDP] Escuchando en puerto ${UDP_PORT}`);
 });
 
-// --- MQTT: Conexión al broker público de EMQX ---
-const MQTT_BROKER_URL = 'mqtt://broker.emqx.io:1883';
-const mqttClient = mqtt.connect(MQTT_BROKER_URL, {
-  clientId: `backend_${Math.random().toString(16).substring(2, 10)}`,
-});
-
-mqttClient.on('connect', () => {
-  console.log(`[MQTT] Conectado exitosamente al broker público EMQX`);
-  mqttClient.subscribe('gps/data', (err) => {
-    if (!err) {
-      console.log(`[MQTT] Suscrito correctamente al topic: gps/data`);
-    } else {
-      console.error(`[MQTT] Error al suscribirse: ${err}`);
-    }
-  });
-});
-
-mqttClient.on('message', (topic, message) => {
-  console.log(`[MQTT] Recibido en ${topic}: ${message.toString()}`);
-  wss.clients.forEach((client) => {
-    if (client.readyState === client.OPEN) {
-      client.send(message.toString());
-    }
-  });
-});
-
-mqttClient.on('error', (error) => {
-  console.error('[MQTT] Error de conexión:', error);
-});
-
-// --- Legacy HTTP endpoint (puedes borrarlo cuando no lo necesites) ---
-app.post('/gps-update', (req, res) => {
-  const { lat, lon } = req.body;
-  console.log(`Received GPS data via POST: lat=${lat}, lon=${lon}`);
-  if (lat === undefined || lon === undefined) {
-    return res.status(400).json({ error: 'Invalid coordinates. Expecting lat and lon.' });
+udpServer.on('message', (msg, rinfo) => {
+  if (msg.length < 9) {
+    console.log(`[UDP] Mensaje muy corto desde ${rinfo.address}:${rinfo.port}`);
+    return;
   }
-  const payload = JSON.stringify({ lat, lng: lon });
+
+  const magic = msg[0];
+  if (magic !== 0x47) {
+    console.log(`[UDP] Magic incorrecto: ${magic.toString(16)}`);
+    return;
+  }
+
+  // Decodificar floats (IEEE 754)
+  const buffer = Buffer.from(msg);
+  const lat = buffer.readFloatLE(1);
+  const lon = buffer.readFloatLE(5);
+
+  console.log(`[UDP] Posicion recibida: ${lat.toFixed(6)}, ${lon.toFixed(6)} desde ${rinfo.address}`);
+
+  // Broadcasts a WebSocket clients
+  const payload = JSON.stringify({
+    l: lat,      // latitude
+    o: lon,      // longitude (origin)
+    ts: new Date().toISOString()
+  });
+
   wss.clients.forEach((client) => {
     if (client.readyState === client.OPEN) {
       client.send(payload);
     }
   });
-  res.status(200).json({ message: 'Position received and broadcasted' });
+});
+
+udpServer.on('error', (err) => {
+  console.error(`[UDP] Error: ${err}`);
+  udpServer.close();
+});
+
+// --- WebSocket Server ---
+app.use(express.json());
+
+const frontendDistPath = path.join(process.cwd(), 'dist');
+console.log(`Sirviendo archivos estaticos desde: ${frontendDistPath}`);
+app.use(express.static(frontendDistPath));
+
+wss.on('connection', (ws) => {
+  console.log('Cliente WebSocket conectado');
+  ws.on('close', () => console.log('Cliente WebSocket desconectado'));
+  ws.on('error', (error) => console.error('Error WebSocket:', error));
+});
+
+// --- Legacy HTTP endpoint (fallback) ---
+app.post('/gps-update', (req, res) => {
+  const { lat, lon, l, o } = req.body;
+  const latitude = lat || l;
+  const longitude = lon || o;
+
+  console.log(`[HTTP] Posicion recibida: ${latitude}, ${longitude}`);
+
+  if (latitude === undefined || longitude === undefined) {
+    return res.status(400).json({ error: 'Falta lat/lon o l/o' });
+  }
+
+  const payload = JSON.stringify({
+    l: latitude,
+    o: longitude,
+    ts: new Date().toISOString()
+  });
+
+  wss.clients.forEach((client) => {
+    if (client.readyState === client.OPEN) {
+      client.send(payload);
+    }
+  });
+
+  res.status(200).json({ message: 'Posicion recibida y transmitida' });
 });
 
 // --- SPA Fallback ---
@@ -74,21 +102,7 @@ app.get('/*', (req, res) => {
   res.sendFile(indexPath);
 });
 
-// --- TCP raw server (opcional, por si acaso) ---
-net.createServer((socket) => {
-  let buf = '';
-  socket.on('data', (chunk) => {
-    buf += chunk.toString();
-    if (buf.includes('#')) {
-      const trama = buf.substring(0, buf.indexOf('#'));
-      buf = buf.substring(buf.indexOf('#') + 1);
-      const partes = trama.split(',');
-      const payload = JSON.stringify({ lat: parseFloat(partes[1]), lng: parseFloat(partes[2]) });
-      wss.clients.forEach((c) => { if (c.readyState === c.OPEN) c.send(payload); });
-    }
-  });
-}).listen(5001);
-
 server.listen(PORT, () => {
-  console.log(`HTTP and WebSocket server running on port ${PORT}`);
+  console.log(`[HTTP+WS] Servidor escuchando en puerto ${PORT}`);
+  console.log(`[UDP] Asegurate que puerto ${UDP_PORT} está abierto en firewall`);
 });
