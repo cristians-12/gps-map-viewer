@@ -54,8 +54,8 @@ export function Viewer() {
     ws.onmessage = (event) => {
       const data = JSON.parse(event.data);
       console.log('Received new position from WebSocket:', data);
-      if (data.lat && data.lng) {
-        setPos(data);
+      if (data.l !== undefined && data.o !== undefined) {
+        setPos({ lat: data.l, lng: data.o });
       }
     };
 
